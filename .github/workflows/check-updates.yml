@@ -1,100 +1,109 @@
 name: Check for Fabric Updates
 
 on:
-    schedule:
-        - cron: "59 23 * * *" # Todos los días a las 23:59
-    workflow_dispatch: # Permite ejecución manual para probar
+  schedule:
+    - cron: "59 23 * * *" # Todos los días a las 23:59
+  workflow_dispatch: # Permite ejecución manual para probar
+
+env:
+  DEFAULT_MC_VERSION: "1.21.1"
 
 jobs:
-    check-version:
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write # Necesario para hacer git push
-            actions: write # Necesario para gatillar workflows
-            pull-requests: write # Necesario para crear PRs
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Necesario para hacer git push
+      actions: write # Necesario para gatillar workflows
+      pull-requests: write # Necesario para crear PRs
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Check for updates
-              id: check
-              run: |
-                  MC_VERSION=$(grep "MC_VERSION:" .github/workflows/dockerimage.yml | awk -F '"' '{print $2}')
-                  if [ -z "$MC_VERSION" ]; then
-                     echo "Could not parse MC_VERSION from dockerimage.yml"
-                     exit 1
-                  fi
-                  echo "Minecraft Version: $MC_VERSION"
-                  echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
+      - name: Check for updates
+        id: check
+        run: |
+          if [ -f fabric_version.txt ]; then
+            if grep -q "=" fabric_version.txt; then
+                source fabric_version.txt
+                STORED_LOADER=$LOADER
+                STORED_INSTALLER=$INSTALLER
+                # Use file version if present, otherwise fallback to env
+                MC_VERSION=${MC_VERSION:-${{ env.DEFAULT_MC_VERSION }}}
+            else
+                # Fallback for old format check
+                STORED_LOADER=$(cat fabric_version.txt)
+                STORED_INSTALLER="0.0.0"
+                MC_VERSION="${{ env.DEFAULT_MC_VERSION }}" # Default fallback if missing
+            fi
+          else
+            STORED_LOADER="0.0.0"
+            STORED_INSTALLER="0.0.0"
+            MC_VERSION="${{ env.DEFAULT_MC_VERSION }}"
+          fi
 
-                  if [ -f fabric_version.txt ]; then
-                    if grep -q "=" fabric_version.txt; then
-                        source fabric_version.txt
-                        STORED_LOADER=$LOADER
-                        STORED_INSTALLER=$INSTALLER
-                    else
-                        STORED_LOADER=$(cat fabric_version.txt)
-                        STORED_INSTALLER="0.0.0"
-                    fi
-                  else
-                    STORED_LOADER="0.0.0"
-                    STORED_INSTALLER="0.0.0"
-                  fi
+          if [ -z "$MC_VERSION" ]; then
+             echo "Could not find MC_VERSION in fabric_version.txt"
+             exit 1
+          fi
+          echo "Minecraft Version: $MC_VERSION"
+          echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
 
-                  echo "Stored Loader: $STORED_LOADER"
-                  echo "Stored Installer: $STORED_INSTALLER"
+          echo "Stored Loader: $STORED_LOADER"
+          echo "Stored Installer: $STORED_INSTALLER"
 
-                  LATEST_LOADER=$(curl -s https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version')
-                  LATEST_INSTALLER=$(curl -s https://meta.fabricmc.net/v2/versions/installer | jq -r '.[0].version')
+          LATEST_LOADER=$(curl -s https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version')
+          LATEST_INSTALLER=$(curl -s https://meta.fabricmc.net/v2/versions/installer | jq -r '.[0].version')
 
-                  if [ -z "$LATEST_LOADER" ] || [ "$LATEST_LOADER" = "null" ]; then
-                    echo "Error fetching latest loader version"
-                    exit 1
-                  fi
-                  if [ -z "$LATEST_INSTALLER" ] || [ "$LATEST_INSTALLER" = "null" ]; then
-                    echo "Error fetching latest installer version"
-                    exit 1
-                  fi
+          if [ -z "$LATEST_LOADER" ] || [ "$LATEST_LOADER" = "null" ]; then
+            echo "Error fetching latest loader version"
+            exit 1
+          fi
+          if [ -z "$LATEST_INSTALLER" ] || [ "$LATEST_INSTALLER" = "null" ]; then
+            echo "Error fetching latest installer version"
+            exit 1
+          fi
 
-                  echo "Latest Loader: $LATEST_LOADER"
-                  echo "Latest Installer: $LATEST_INSTALLER"
+          echo "Latest Loader: $LATEST_LOADER"
+          echo "Latest Installer: $LATEST_INSTALLER"
 
-                  if [ "$STORED_LOADER" != "$LATEST_LOADER" ] || [ "$STORED_INSTALLER" != "$LATEST_INSTALLER" ]; then
-                    echo "New version detected!"
-                    echo "new_loader=$LATEST_LOADER" >> $GITHUB_OUTPUT
-                    echo "new_installer=$LATEST_INSTALLER" >> $GITHUB_OUTPUT
-                    echo "update_needed=true" >> $GITHUB_OUTPUT
-                    
-                    echo "LOADER=$LATEST_LOADER" > fabric_version.txt
-                    echo "INSTALLER=$LATEST_INSTALLER" >> fabric_version.txt
-                    
-                  else
-                    echo "Versions match. No update needed."
-                    echo "update_needed=false" >> $GITHUB_OUTPUT
-                  fi
+          if [ "$STORED_LOADER" != "$LATEST_LOADER" ] || [ "$STORED_INSTALLER" != "$LATEST_INSTALLER" ]; then
+            echo "New version detected!"
+            echo "new_loader=$LATEST_LOADER" >> $GITHUB_OUTPUT
+            echo "new_installer=$LATEST_INSTALLER" >> $GITHUB_OUTPUT
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            
+            # Re-write file keeping MC_VERSION
+            echo "LOADER=$LATEST_LOADER" > fabric_version.txt
+            echo "INSTALLER=$LATEST_INSTALLER" >> fabric_version.txt
+            echo "MC_VERSION=$MC_VERSION" >> fabric_version.txt
+            
+          else
+            echo "Versions match. No update needed."
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          fi
 
-            - name: Create Release Branch, Push and PR
-              if: steps.check.outputs.update_needed == 'true'
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  NEW_LOADER="${{ steps.check.outputs.new_loader }}"
-                  NEW_INSTALLER="${{ steps.check.outputs.new_installer }}"
-                  MC_VERSION="${{ steps.check.outputs.mc_version }}"
-                  BRANCH_NAME="release/${MC_VERSION}-${NEW_LOADER}"
+      - name: Create Release Branch, Push and PR
+        if: steps.check.outputs.update_needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_LOADER="${{ steps.check.outputs.new_loader }}"
+          NEW_INSTALLER="${{ steps.check.outputs.new_installer }}"
+          MC_VERSION="${{ steps.check.outputs.mc_version }}"
+          BRANCH_NAME="release/${MC_VERSION}-${NEW_LOADER}"
 
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-                  git add fabric_version.txt
-                  git commit -m "chore: update fabric to Loader: $NEW_LOADER, Installer: $NEW_INSTALLER"
+          git add fabric_version.txt
+          git commit -m "chore: update fabric to Loader: $NEW_LOADER, Installer: $NEW_INSTALLER"
 
-                  git checkout -b "$BRANCH_NAME"
-                  git push origin "$BRANCH_NAME" --force
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME" --force
 
-                  gh pr create \
-                    --title "chore: Release Fabric $NEW_LOADER (Installer $NEW_INSTALLER)" \
-                    --body "Automated PR to update:\n- Fabric Loader: **$NEW_LOADER**\n- Fabric Installer: **$NEW_INSTALLER**\n\nFor Minecraft: $MC_VERSION" \
-                    --base main \
-                    --head "$BRANCH_NAME" || echo "PR might already exist, skipping creation."
+          gh pr create \
+            --title "chore: Release Fabric $NEW_LOADER (Installer $NEW_INSTALLER)" \
+            --body "Automated PR to update:\n- Fabric Loader: **$NEW_LOADER**\n- Fabric Installer: **$NEW_INSTALLER**\n\nFor Minecraft: $MC_VERSION" \
+            --base main \
+            --head "$BRANCH_NAME" || echo "PR might already exist, skipping creation."

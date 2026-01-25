@@ -4,13 +4,10 @@ on:
   push:
     branches:
       - "main"
+      - "legacy/*"
   workflow_dispatch:
 
-# ✏️ Change version here
 env:
-  MC_VERSION: "1.21.11"
-  # GitHub Container Registry Image Name
-  # Ensure this is all lowercase. format: ghcr.io/<username>/<package_name>
   IMAGE_NAME: ghcr.io/alvarosdev/zulu-fabricmc
 
 jobs:
@@ -25,9 +22,6 @@ jobs:
     steps:
       - name: 💻 Checkout code
         uses: actions/checkout@v4
-
-      # Note: GHCR automatically displays the README of the repository linked to the package.
-      # The detailed "sync-readme" action is Docker Hub specific and has been removed.
 
       - name: 📦 Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -45,18 +39,24 @@ jobs:
       - name: 📖 Read Fabric Version
         id: fabric_version
         run: |
+          # 1. Load defaults from file
           if [ -f fabric_version.txt ]; then
-            if grep -q "=" fabric_version.txt; then
-              source fabric_version.txt
-              echo "loader=$LOADER" >> $GITHUB_OUTPUT
-            else
-              LOADER=$(cat fabric_version.txt)
-              echo "loader=$LOADER" >> $GITHUB_OUTPUT
-            fi
+            source fabric_version.txt
           else
             echo "::error::fabric_version.txt not found"
             exit 1
           fi
+
+          # 2. Override if legacy branch
+          if [[ "${{ github.ref_name }}" == legacy/* ]]; then
+             echo "Detected legacy branch: ${{ github.ref_name }}"
+             MC_VERSION=${GITHUB_REF_NAME#legacy/}
+             echo "Overriding MC_VERSION to $MC_VERSION"
+          fi
+
+          # 3. Output variables
+          echo "loader=$LOADER" >> $GITHUB_OUTPUT
+          echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
 
       - name: 🏷️ Extract Docker metadata
         id: meta
@@ -65,8 +65,8 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ env.MC_VERSION }}
-            type=raw,value=${{ env.MC_VERSION }}-${{ steps.fabric_version.outputs.loader }}
+            type=raw,value=${{ steps.fabric_version.outputs.mc_version }}
+            type=raw,value=${{ steps.fabric_version.outputs.mc_version }}-${{ steps.fabric_version.outputs.loader }}
 
       - name: 📦 Build and push
         uses: docker/build-push-action@v6
@@ -77,6 +77,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            MCVERSION=${{ env.MC_VERSION }}
+            MCVERSION=${{ steps.fabric_version.outputs.mc_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
