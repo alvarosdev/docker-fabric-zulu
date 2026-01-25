@@ -70,12 +70,12 @@ jobs:
                   git commit -m "chore: update fabric version to $NEW_VERSION"
 
                   git checkout -b "$BRANCH_NAME"
-                  # Push de la nueva rama
-                  git push origin "$BRANCH_NAME"
+                  # Push de la nueva rama (force para sobrescribir si ya existe tras un reintento)
+                  git push origin "$BRANCH_NAME" --force
 
-                  # Crear PR
+                  # Crear PR (si falla porque ya existe, no rompemos el workflow)
                   gh pr create \
                     --title "chore: Release Fabric $NEW_VERSION for MC $MC_VERSION" \
                     --body "Automated PR to update Fabric version to $NEW_VERSION. Merging this PR will trigger the build workflow." \
                     --base main \
-                    --head "$BRANCH_NAME"
+                    --head "$BRANCH_NAME" || echo "PR might already exist, skipping creation."
