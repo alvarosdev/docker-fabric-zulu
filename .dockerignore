@@ -1,12 +1,34 @@
-world*/**
-plugins/**
-logs/**
-versions/**
-cache/**
-config/**
-libraries/**
-logs/**
+# Git
+.git/
+.gitignore
+
+# GitHub
+.github/
+
+# Documentation and assets
+README.md
+LICENSE.txt
+assets/
+
+# Development files
+Makefile
+
+# Minecraft server data (when building from server directory)
+world*/
+plugins/
+mods/
+logs/
+versions/
+cache/
+config/
+libraries/
+.fabric/
 .console_history
+
+# Data files
 *.json
 *.yml
-.fabric/**
+!docker-compose.yml
+
+# Local development
+minecraft_server/

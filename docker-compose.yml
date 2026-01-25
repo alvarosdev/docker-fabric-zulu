@@ -1,20 +1,28 @@
-version: "3.9"
-
 services:
   minecraft:
     container_name: "fabricserver"
-    build:
-      dockerfile: ./Dockerfile
-      context: ./
+    image: als3bas/zulu-fabricmc:latest
+    # Uncomment below to build locally instead of using the image
+    # build:
+    #   dockerfile: ./Dockerfile
+    #   context: ./
     restart: unless-stopped
     environment:
       MEMORYSIZE: "5G"
       PUID: ""
       PGID: ""
+      # RCON settings for healthcheck (optional, set in server.properties)
+      # RCON_PASSWORD: "minecraft"
     volumes:
       - ./minecraft_server:/data:rw
     ports:
       - "25565:25565"
     stdin_open: true
     tty: true
-
+    # Healthcheck requires RCON to be enabled in server.properties
+    # healthcheck:
+    #   test: ["CMD", "rcon-cli", "--host", "localhost", "--port", "25575", "--password", "minecraft", "ping"]
+    #   interval: 60s
+    #   timeout: 10s
+    #   start_period: 120s
+    #   retries: 3

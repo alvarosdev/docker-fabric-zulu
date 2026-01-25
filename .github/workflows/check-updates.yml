@@ -1,0 +1,68 @@
+name: Check for Fabric Updates
+
+on:
+    schedule:
+        - cron: "59 23 * * *" # Todos los días a las 23:59
+    workflow_dispatch: # Permite ejecución manual para probar
+
+jobs:
+    check-version:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write # Necesario para hacer git push
+            actions: write # Necesario para gatillar workflows
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Check for updates
+              id: check
+              run: |
+                  # 1. Obtener la versión guardada en el repo
+                  if [ -f fabric_version.txt ]; then
+                    STORED_VERSION=$(cat fabric_version.txt)
+                  else
+                    STORED_VERSION="none"
+                  fi
+                  echo "Stored version: $STORED_VERSION"
+
+                  # 2. Obtener la última versión de Fabric Loader desde la API
+                  # Usamos jq para parsear el JSON (ya viene en ubuntu-latest)
+                  LATEST_VERSION=$(curl -s https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version')
+
+                  if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
+                    echo "Error fetching latest version"
+                    exit 1
+                  fi
+                  echo "Latest version: $LATEST_VERSION"
+
+                  # 3. Comparar versiones
+                  if [ "$STORED_VERSION" != "$LATEST_VERSION" ]; then
+                    echo "New version detected!"
+                    echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+                    echo "update_needed=true" >> $GITHUB_OUTPUT
+                    
+                    # Guardar la nueva versión en el archivo
+                    echo "$LATEST_VERSION" > fabric_version.txt
+                  else
+                    echo "Versions match. No update needed."
+                    echo "update_needed=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Commit and Push new version
+              if: steps.check.outputs.update_needed == 'true'
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add fabric_version.txt
+                  git commit -m "chore: update fabric version to ${{ steps.check.outputs.new_version }}"
+                  git push
+
+            - name: Trigger Build Workflow
+              if: steps.check.outputs.update_needed == 'true'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  echo "Triggering dockerimage.yml..."
+                  gh workflow run dockerimage.yml
