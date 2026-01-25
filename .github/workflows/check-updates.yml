@@ -19,7 +19,14 @@ jobs:
             - name: Check for updates
               id: check
               run: |
-                  # 1. Obtener la versión guardada en el repo
+                  MC_VERSION=$(grep "MC_VERSION:" .github/workflows/dockerimage.yml | awk -F '"' '{print $2}')
+                  if [ -z "$MC_VERSION" ]; then
+                     echo "Could not parse MC_VERSION from dockerimage.yml"
+                     exit 1
+                  fi
+                  echo "Minecraft Version: $MC_VERSION"
+                  echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
+
                   if [ -f fabric_version.txt ]; then
                     STORED_VERSION=$(cat fabric_version.txt)
                   else
@@ -27,42 +34,40 @@ jobs:
                   fi
                   echo "Stored version: $STORED_VERSION"
 
-                  # 2. Obtener la última versión de Fabric Loader desde la API
-                  # Usamos jq para parsear el JSON (ya viene en ubuntu-latest)
                   LATEST_VERSION=$(curl -s https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version')
 
                   if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
                     echo "Error fetching latest version"
                     exit 1
                   fi
-                  echo "Latest version: $LATEST_VERSION"
+                  echo "Latest Fabric version: $LATEST_VERSION"
 
-                  # 3. Comparar versiones
                   if [ "$STORED_VERSION" != "$LATEST_VERSION" ]; then
                     echo "New version detected!"
                     echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
                     echo "update_needed=true" >> $GITHUB_OUTPUT
                     
-                    # Guardar la nueva versión en el archivo
                     echo "$LATEST_VERSION" > fabric_version.txt
                   else
                     echo "Versions match. No update needed."
                     echo "update_needed=false" >> $GITHUB_OUTPUT
                   fi
 
-            - name: Commit and Push new version
-              if: steps.check.outputs.update_needed == 'true'
-              run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
-                  git add fabric_version.txt
-                  git commit -m "chore: update fabric version to ${{ steps.check.outputs.new_version }}"
-                  git push
-
-            - name: Trigger Build Workflow
+            - name: Create Release Branch and Push
               if: steps.check.outputs.update_needed == 'true'
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  echo "Triggering dockerimage.yml..."
-                  gh workflow run dockerimage.yml
+                  NEW_VERSION="${{ steps.check.outputs.new_version }}"
+                  MC_VERSION="${{ steps.check.outputs.mc_version }}"
+                  BRANCH_NAME="release/${MC_VERSION}-${NEW_VERSION}"
+
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  git add fabric_version.txt
+                  git commit -m "chore: update tracked fabric version to $NEW_VERSION"
+                  git push origin HEAD:main || echo "⚠️ Could not push to main. State not saved."
+
+                  git checkout -b "$BRANCH_NAME"
+                  git push origin "$BRANCH_NAME"

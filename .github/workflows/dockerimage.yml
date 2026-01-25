@@ -3,7 +3,7 @@ name: Build and push
 on:
   push:
     branches:
-      - "main"
+      - "release/*"
   workflow_dispatch:
 
 # ✏️ Change version here
