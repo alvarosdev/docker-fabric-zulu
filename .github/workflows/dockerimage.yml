@@ -11,7 +11,7 @@ env:
   MC_VERSION: "1.21.11"
   # GitHub Container Registry Image Name
   # Ensure this is all lowercase. format: ghcr.io/<username>/<package_name>
-  IMAGE_NAME: ghcr.io/als3bas/zulu-fabricmc
+  IMAGE_NAME: ghcr.io/alvarosdev/zulu-fabricmc
 
 jobs:
   build:

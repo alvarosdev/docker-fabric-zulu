@@ -1,7 +1,7 @@
 services:
   minecraft:
     container_name: "fabricserver"
-    image: ghcr.io/als3bas/zulu-fabricmc:latest
+    image: ghcr.io/alvarosdev/zulu-fabricmc:latest
     # Uncomment below to build locally instead of using the image
     # build:
     #   dockerfile: ./Dockerfile

@@ -32,4 +32,4 @@ This workflow builds the Docker image and pushes it to the GitHub Container Regi
 **Steps:**
 1.  **Builds**: Uses `docker buildx` to build a multi-arch image.
 2.  **Tags**: Tags the image with `latest` and the Minecraft version.
-3.  **Pushes**: Pushes the resulting image to `ghcr.io/als3bas/zulu-fabricmc`.
+3.  **Pushes**: Pushes the resulting image to `ghcr.io/alvarosdev/zulu-fabricmc`.

@@ -30,7 +30,7 @@ This is the easiest way to manage your server.
    ```yaml
    services:
      minecraft:
-       image: ghcr.io/als3bas/zulu-fabricmc:latest
+       image: ghcr.io/alvarosdev/zulu-fabricmc:latest
        container_name: fabricserver
        restart: unless-stopped
        ports:
@@ -56,7 +56,7 @@ docker run -d \
   -p 25565:25565 \
   -v $(pwd)/minecraft_data:/data \
   -e MEMORYSIZE=4G \
-  ghcr.io/als3bas/zulu-fabricmc:latest
+  ghcr.io/alvarosdev/zulu-fabricmc:latest
 ```
 
 ---
