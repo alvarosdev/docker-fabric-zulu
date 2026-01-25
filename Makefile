@@ -1,6 +1,7 @@
 COMMAND_COLOR = \033[36m
 DESC_COLOR    = \033[32m
 CLEAR_COLOR   = \033[0m
+SERVICE_NAME  = minecraft
 
 .PHONY: help
 help: ## prints this message ## 
@@ -13,51 +14,56 @@ help: ## prints this message ##
 	perl -nle '/(.*?): ## (.*?) ## (.*$$)/; if ($$3 eq "") { printf ( "$(COMMAND_COLOR)%-20s$(DESC_COLOR)%s$(CLEAR_COLOR)\n\n", $$1, $$2) } else { printf ( "$(COMMAND_COLOR)%-20s$(DESC_COLOR)%s$(CLEAR_COLOR)\n%-20s%s\n\n", $$1, $$2, " ", $$3) }';
 
 .PHONY: up
-up: ## 🚙 Runs the Minecraft server ## (docker-compose up -d) 
-	@echo "📦 Starting Minecraft Server..."; \
-	docker-compose up -d;
+up: ## 🚙 Runs the server ## (docker-compose up -d) 
+	@echo "📦 Starting..."
+	@docker-compose up -d
 
 .PHONY: stop
-stop: ## 🛑 Stops the Minecraft server ## (docker-compose stop) 
-	@echo "🛑 Stopping Minecraft Server and cleaning up..."; \
-	docker-compose stop;
+stop: ## 🛑 Stops the server ## (docker-compose stop) 
+	@echo "🛑 Stopping..."
+	@docker-compose stop
 
 .PHONY: down
-down: ## 👎 Stops and remove containers, but keeps data ## (docker-compose down) 
-	@echo "👎🏻 Down server..."; \
-	docker-compose down;
+down: ## 👎 Remove containers and network ## (Keep volumes) 
+	@echo "👎🏻 Tearing down..."
+	@docker-compose down
 
 .PHONY: build
-build: ## 📦 Rebuilds the container (Keeps Data) ## (Only with the Dockerfile, otherwise 'update-container' command ) 
-	@echo "🛠️ Building server and getting latest papermc version" ; \
-	docker-compose down --rmi all --remove-orphans;
-	docker-compose up -d --build --force-recreate; \
-	make logs;
+build: ## �️ Rebuilds the image locally ## (Using Dockerfile) 
+	@echo "🛠️ Rebuilding image..."
+	@docker-compose build --no-cache
+	@$(MAKE) up
+	@$(MAKE) logs
 
 .PHONY: restart
-restart: ## 🔃 Restarts the container  ## (Useful to reload plugins or config files, this will kick all players)
-	@echo "💣 Restarting the server (docker)"; \
-	docker-compose restart; \
-	make logs;
+restart: ## 🔃 Restarts the container ## (Quick reload)
+	@echo "� Restarting..."
+	@docker-compose restart
+	@$(MAKE) logs
 
-.PHONY: update-container
-update-container: ## 💻 Update the container image ## (Only with the docker-compose image, otherwise 'build' command)
-	@echo "💣 Restarting the server (docker)"; \
-	docker-compose stop; \
-	docker-compose pull; \
-	docker-compose up -d; \
-	make logs;
-
-.PHONY: attach
-attach: ## 💻 Attach the Minecraft server console ## (Remember to press Ctrl-P Ctrl-Q to detach, not Ctrl-C) 
-	@echo "📌 Attaching to Minecraft..."; \
-	echo "Ctrl-C stops Minecraft and exits"; \
-	echo "Ctrl-P Ctrl-Q only exits"; \
-	echo ""; \
-	echo "Type "help" for help."; \
-	docker attach fabricserver;
+.PHONY: update
+update: ## ⬇️ Pulls latest image and restarts ## (For pre-built image users)
+	@echo "⬇️ Pulling latest updates..."
+	@docker-compose pull
+	@$(MAKE) up
+	@$(MAKE) logs
 
 .PHONY: logs
-logs: ## 🧻 Show the last 20 logs ## (docker-compose logs --tail 20 -f) 
-	echo "🧻 Logs..."; \
-	docker-compose logs --tail 20 -f ;
+logs: ## 🧻 Follow logs ## 
+	@docker-compose logs --tail 50 -f $(SERVICE_NAME)
+
+.PHONY: attach
+attach: ## � Attach to console ## (Ctrl+P+Q to detach!) 
+	@echo "📌 Attaching to console..."
+	@echo "⚠️  REMEMBER: Use [Ctrl+P] then [Ctrl+Q] to detach safely."
+	@echo "   (Ctrl+C will KILL the server!)"
+	@echo ""
+	@docker attach fabricserver
+
+.PHONY: clean
+clean: ## � Remove everything ## (WARNING: DELETES DATA!)
+	@echo "⚠️  WARNING: This will delete the 'minecraft_data' folder!"
+	@read -p "Are you sure? [y/N] " ans && [ $${ans:-N} = y ]
+	@docker-compose down -v --remove-orphans
+	@rm -rf minecraft_data
+	@echo "🧹 Cleaned."

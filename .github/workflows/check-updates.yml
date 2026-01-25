@@ -29,26 +29,46 @@ jobs:
                   echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
 
                   if [ -f fabric_version.txt ]; then
-                    STORED_VERSION=$(cat fabric_version.txt)
+                    if grep -q "=" fabric_version.txt; then
+                        source fabric_version.txt
+                        STORED_LOADER=$LOADER
+                        STORED_INSTALLER=$INSTALLER
+                    else
+                        STORED_LOADER=$(cat fabric_version.txt)
+                        STORED_INSTALLER="0.0.0"
+                    fi
                   else
-                    STORED_VERSION="none"
+                    STORED_LOADER="0.0.0"
+                    STORED_INSTALLER="0.0.0"
                   fi
-                  echo "Stored version: $STORED_VERSION"
 
-                  LATEST_VERSION=$(curl -s https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version')
+                  echo "Stored Loader: $STORED_LOADER"
+                  echo "Stored Installer: $STORED_INSTALLER"
 
-                  if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
-                    echo "Error fetching latest version"
+                  LATEST_LOADER=$(curl -s https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version')
+                  LATEST_INSTALLER=$(curl -s https://meta.fabricmc.net/v2/versions/installer | jq -r '.[0].version')
+
+                  if [ -z "$LATEST_LOADER" ] || [ "$LATEST_LOADER" = "null" ]; then
+                    echo "Error fetching latest loader version"
                     exit 1
                   fi
-                  echo "Latest Fabric version: $LATEST_VERSION"
+                  if [ -z "$LATEST_INSTALLER" ] || [ "$LATEST_INSTALLER" = "null" ]; then
+                    echo "Error fetching latest installer version"
+                    exit 1
+                  fi
 
-                  if [ "$STORED_VERSION" != "$LATEST_VERSION" ]; then
+                  echo "Latest Loader: $LATEST_LOADER"
+                  echo "Latest Installer: $LATEST_INSTALLER"
+
+                  if [ "$STORED_LOADER" != "$LATEST_LOADER" ] || [ "$STORED_INSTALLER" != "$LATEST_INSTALLER" ]; then
                     echo "New version detected!"
-                    echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+                    echo "new_loader=$LATEST_LOADER" >> $GITHUB_OUTPUT
+                    echo "new_installer=$LATEST_INSTALLER" >> $GITHUB_OUTPUT
                     echo "update_needed=true" >> $GITHUB_OUTPUT
                     
-                    echo "$LATEST_VERSION" > fabric_version.txt
+                    echo "LOADER=$LATEST_LOADER" > fabric_version.txt
+                    echo "INSTALLER=$LATEST_INSTALLER" >> fabric_version.txt
+                    
                   else
                     echo "Versions match. No update needed."
                     echo "update_needed=false" >> $GITHUB_OUTPUT
@@ -59,23 +79,22 @@ jobs:
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  NEW_VERSION="${{ steps.check.outputs.new_version }}"
+                  NEW_LOADER="${{ steps.check.outputs.new_loader }}"
+                  NEW_INSTALLER="${{ steps.check.outputs.new_installer }}"
                   MC_VERSION="${{ steps.check.outputs.mc_version }}"
-                  BRANCH_NAME="release/${MC_VERSION}-${NEW_VERSION}"
+                  BRANCH_NAME="release/${MC_VERSION}-${NEW_LOADER}"
 
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
 
                   git add fabric_version.txt
-                  git commit -m "chore: update fabric version to $NEW_VERSION"
+                  git commit -m "chore: update fabric to Loader: $NEW_LOADER, Installer: $NEW_INSTALLER"
 
                   git checkout -b "$BRANCH_NAME"
-                  # Push de la nueva rama (force para sobrescribir si ya existe tras un reintento)
                   git push origin "$BRANCH_NAME" --force
 
-                  # Crear PR (si falla porque ya existe, no rompemos el workflow)
                   gh pr create \
-                    --title "chore: Release Fabric $NEW_VERSION for MC $MC_VERSION" \
-                    --body "Automated PR to update Fabric version to $NEW_VERSION. Merging this PR will trigger the build workflow." \
+                    --title "chore: Release Fabric $NEW_LOADER (Installer $NEW_INSTALLER)" \
+                    --body "Automated PR to update:\n- Fabric Loader: **$NEW_LOADER**\n- Fabric Installer: **$NEW_INSTALLER**\n\nFor Minecraft: $MC_VERSION" \
                     --base main \
                     --head "$BRANCH_NAME" || echo "PR might already exist, skipping creation."

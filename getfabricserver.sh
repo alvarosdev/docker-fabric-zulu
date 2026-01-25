@@ -8,17 +8,20 @@ if [ -z "${MINECRAFT_VERSION}" ]; then
     exit 1
 fi
 
-# Remove old jar if exists
 rm -f fabric.jar
 
-echo "Fetching latest Fabric versions..."
-
-# Fetch versions
-LATEST_FABRIC_LOADER=$(curl -s https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version')
-LATEST_INSTALLER=$(curl -s https://meta.fabricmc.net/v2/versions/installer | jq -r '.[0].version')
+if [ -f /fabric_version.txt ]; then
+    . /fabric_version.txt
+    
+    LATEST_FABRIC_LOADER=$LOADER
+    LATEST_INSTALLER=$INSTALLER
+else
+    echo "Error: /fabric_version.txt not found!"
+    exit 1
+fi
 
 if [ -z "${LATEST_FABRIC_LOADER}" ] || [ -z "${LATEST_INSTALLER}" ]; then
-    echo "Error: Failed to fetch Fabric versions from meta.fabricmc.net"
+    echo "Error: failed to retrieve versions from fabric_version.txt"
     exit 1
 fi
 
@@ -31,5 +34,4 @@ echo "Latest Fabric Installer Version: ${LATEST_INSTALLER}"
 echo "Downloading URL:                 ${FABRIC_DOWNLOAD_URL}"
 echo "------------------------------"
 
-# Download with fail flag (-f) to error out on 404s
 curl -f -s -o fabric.jar "${FABRIC_DOWNLOAD_URL}"

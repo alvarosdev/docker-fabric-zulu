@@ -42,6 +42,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 📖 Read Fabric Version
+        id: fabric_version
+        run: |
+          if [ -f fabric_version.txt ]; then
+            if grep -q "=" fabric_version.txt; then
+              source fabric_version.txt
+              echo "loader=$LOADER" >> $GITHUB_OUTPUT
+            else
+              LOADER=$(cat fabric_version.txt)
+              echo "loader=$LOADER" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "::error::fabric_version.txt not found"
+            exit 1
+          fi
+
       - name: 🏷️ Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -50,6 +66,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ env.MC_VERSION }}
+            type=raw,value=${{ env.MC_VERSION }}-${{ steps.fabric_version.outputs.loader }}
 
       - name: 📦 Build and push
         uses: docker/build-push-action@v6

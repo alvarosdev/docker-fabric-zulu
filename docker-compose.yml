@@ -1,7 +1,7 @@
 services:
   minecraft:
     container_name: "fabricserver"
-    image: als3bas/zulu-fabricmc:latest
+    image: ghcr.io/als3bas/zulu-fabricmc:latest
     # Uncomment below to build locally instead of using the image
     # build:
     #   dockerfile: ./Dockerfile
@@ -14,7 +14,7 @@ services:
       # RCON settings for healthcheck (optional, set in server.properties)
       # RCON_PASSWORD: "minecraft"
     volumes:
-      - ./minecraft_server:/data:rw
+      - ./minecraft_data:/data:rw
     ports:
       - "25565:25565"
     stdin_open: true

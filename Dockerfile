@@ -13,6 +13,7 @@ RUN apk add --no-cache \
 
 WORKDIR /opt/minecraft
 
+COPY ./fabric_version.txt /fabric_version.txt
 COPY ./getfabricserver.sh /getfabricserver.sh
 RUN chmod +x /getfabricserver.sh && \
     sh /getfabricserver.sh ${MCVERSION}
