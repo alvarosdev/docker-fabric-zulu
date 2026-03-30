@@ -2,7 +2,7 @@ name: Check for Fabric Updates
 
 on:
   schedule:
-    - cron: "59 23 * * *" # Todos los días a las 23:59
+    - cron: "59 23 */5 * *" # Todos los días a las 23:59
   workflow_dispatch: # Permite ejecución manual para probar
 
 env:
